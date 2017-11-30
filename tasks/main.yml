@@ -1,0 +1,117 @@
+---
+# Install new template
+#- name: Add repositories
+#  yum_repository:
+#    name: '{{ item.name }}'
+#    description: '{{ item.description }}'
+#    file: PaaS
+#    enabled: True
+##    baseurl: '{{ item.baseurl }}'
+#    gpgcheck: False
+#    state: present
+#  become: True
+#  with_items:
+#    - name: rhel-7-server-rpms
+#      description: RHEL base
+#      baseurl: http://{{ yum_repo_server }}/paas/rhel-7-server-rpms/
+      
+- stat:
+    path: /root/.tower_cli.cfg
+  register: tower_cli_cfg
+
+- name: read the tower-cli file
+  slurp:
+    src: /root/.tower_cli.cfg
+  register: tower_credentials
+  when: tower_cli_cfg.exists is defined
+
+- name: Generate Password
+  shell: echo $( openssl rand -base64 32 | tr -d -c "a-zA-Z0-9" | head -c 12 )
+  register: ansible_admin_password_create
+  when: ( tower_cli_cfg.exists is not defined ) or ( "password" not in tower_credentials['content'] )
+  no_log: True
+
+- name: Cleanup cache to ensure clean installation
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - /var/cache/yum/x86_64
+    
+- name: extract password
+  shell:  awk -F' = ' '/password/{print $2}' /root/.tower_cli.cfg
+  register: ansible_admin_password_extract
+  when: ( tower_cli_cfg.exists is defined ) and ( "password" in tower_credentials['content'] )
+  no_log: True
+
+- name: Set the password
+  set_fact:
+    ansible_admin_password: "{% if ansible_admin_password_extract.stdout is defined %}{{ ansible_admin_password_extract.stdout }}{% else %}{{ ansible_admin_password_create.stdout }}{% endif %}"
+  no_log: True
+    
+- name: Download and Extract bundle
+  unarchive:
+    src: "https://releases.ansible.com/ansible-tower/setup-bundle/ansible-tower-setup-bundle-{{ tower_version }}.tar.gz"
+    dest: "{{ tower_dest }}"
+    remote_src: True
+    exclude: "inventory"
+  register: oc_create_template
+
+# this needs to be a template
+- name: Copy tower-inventory to tower box
+  template:
+    src: "{{ role_path }}/templates/tower-inventory.j2"
+    dest: "{{ tower_dest }}/ansible-tower-setup-bundle-{{ tower_version }}/inventory"
+
+- name: Setup tower
+  shell: ./setup.sh
+  args:
+    chdir: "{{ tower_dest }}/ansible-tower-setup-bundle-{{ tower_version }}"
+
+- name: Ensure backup directory exists
+  file:
+    path: "{{ tower_backup_dest }}"
+    owner: root
+    state: directory
+
+- name: Ensure a backup tower job is created
+  cron:
+    name: "a job for backing up tower"
+    special_time: daily
+    job: "{{ tower_dest }}/ansible-tower-setup-bundle-{{ tower_version }}/setup.sh -b"
+
+
+# TODO: This is a hardcoded URL, which is bad.
+- name: Install pip
+  yum:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - https://anorien.csc.warwick.ac.uk/mirrors/epel/7/x86_64/p/python2-pip-8.1.2-5.el7.noarch.rpm
+    - python-virtualenv
+
+# to review in case of proxy
+- name: Install tower-cli
+  pip:
+    name: ansible-tower-cli
+
+- name: Configure tower-cli host
+  shell: tower-cli config host localhost
+  when:  ( tower_cli_cfg.exists is not defined ) or  ( "host" not in tower_credentials['content'] )
+
+- name: Configure tower-cli user
+  shell: tower-cli config username admin
+  when:   ( tower_cli_cfg.exists is not defined ) or ( "username" not in tower_credentials['content'] )
+
+- name: Configure tower-cli password
+  shell: tower-cli config password '{{ ansible_admin_password }}'
+  when:  ( tower_cli_cfg.exists is not defined ) or ( "password" not in tower_credentials['content'] )
+
+- name: Copy bootstrap script to tower
+  template:
+    src: "{{ role_path }}/templates/bootstrap-tower.sh.j2"
+    dest: "{{tower_dest}}/bootstrap-tower.sh"
+    mode: u+x
+  
+- name: Run bootstrap script
+  shell: "{{tower_dest}}/bootstrap-tower.sh"
