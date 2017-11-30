@@ -1,20 +1,4 @@
 ---
-# Install new template
-#- name: Add repositories
-#  yum_repository:
-#    name: '{{ item.name }}'
-#    description: '{{ item.description }}'
-#    file: PaaS
-#    enabled: True
-##    baseurl: '{{ item.baseurl }}'
-#    gpgcheck: False
-#    state: present
-#  become: True
-#  with_items:
-#    - name: rhel-7-server-rpms
-#      description: RHEL base
-#      baseurl: http://{{ yum_repo_server }}/paas/rhel-7-server-rpms/
-      
 - stat:
     path: /root/.tower_cli.cfg
   register: tower_cli_cfg
