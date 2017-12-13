@@ -1,18 +1,18 @@
 ---
-- stat:
+- name: Check tower_cli file exists
+  stat:
     path: /root/.tower_cli.cfg
   register: tower_cli_cfg
 
-- name: read the tower-cli file
-  slurp:
-    src: /root/.tower_cli.cfg
+- name: Read the tower_cli file
+  command: cat /root/.tower_cli.cfg
   register: tower_credentials
-  when: tower_cli_cfg.exists is defined
+  when: tower_cli_cfg.stat.exists is defined
 
-- name: Generate Password
+- name: Generate Password if no tower_cli file
   shell: echo $( openssl rand -base64 32 | tr -d -c "a-zA-Z0-9" | head -c 12 )
   register: ansible_admin_password_create
-  when: ( tower_cli_cfg.exists is not defined ) or ( "password" not in tower_credentials['content'] )
+  when: ( tower_cli_cfg.stat.exists is not defined ) or ( tower_credentials.stdout.find('password') == -1 )
   no_log: True
 
 - name: Cleanup cache to ensure clean installation
@@ -22,10 +22,10 @@
   with_items:
     - /var/cache/yum/x86_64
     
-- name: extract password
+- name: Extract password from tower_cli file
   shell:  awk -F' = ' '/password/{print $2}' /root/.tower_cli.cfg
   register: ansible_admin_password_extract
-  when: ( tower_cli_cfg.exists is defined ) and ( "password" in tower_credentials['content'] )
+  when: ( tower_cli_cfg.stat.exists is defined ) and ( tower_credentials.stdout.find('password') != -1 )
   no_log: True
 
 - name: Set the password
