@@ -71,7 +71,7 @@
     name: "{{ item }}"
     state: present
   with_items:
-    - https://anorien.csc.warwick.ac.uk/mirrors/epel/7Server/x86_64/Packages/p/python2-pip-8.1.2-5.el7.noarch.rpm
+    - https://anorien.csc.warwick.ac.uk/mirrors/epel/7Server/x86_64/Packages/p/python2-pip-8.1.2-6.el7.noarch.rpm
     - python-virtualenv
 
 # to review in case of proxy
