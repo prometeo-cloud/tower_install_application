@@ -86,7 +86,7 @@
     name: ansible-tower-cli
 
 - name: Configure tower-cli host
-  shell: tower-cli config host localhost
+  shell: tower-cli config host `hostname -f`
   when:  ( tower_cli_cfg.exists is not defined ) or  ( "host" not in tower_credentials['content'] )
 
 - name: Configure tower-cli user
