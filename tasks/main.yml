@@ -4,6 +4,12 @@
     path: /root/.tower_cli.cfg
   register: tower_cli_cfg
 
+- name: Create the file, if it doesnt exist already
+  file:
+    path: /root/.tower_cli.cfg
+    state: touch
+  when: tower_cli_cfg.exists == False 
+
 - name: Read the tower_cli file
   command: cat /root/.tower_cli.cfg
   register: tower_credentials
