@@ -96,3 +96,6 @@
 - name: Configure tower-cli password
   shell: tower-cli config password '{{ ansible_admin_password }}'
   when:  ( tower_cli_cfg.exists is not defined ) or ( "password" not in tower_credentials['content'] )
+
+- name: Configure tower-cli verify_ssl false
+  shell: tower-cli config verify_ssl false
